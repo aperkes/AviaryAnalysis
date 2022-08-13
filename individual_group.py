@@ -19,12 +19,28 @@ male_df = male_df[male_df['Aviary'] != 7]
 
 # get proportion of males pairbonded I guess?
 #model1 = LR().fit(male_df['Degree'],male_df['nPairbonds'])
+
+## Clean some weird division values
+
 if True:
 
-    male_df['nPairbonds'][male_df['nPairbonds'] > 1] = 1
-    model = Lmer("nPairbonds ~ Score + (1|Degree)",data=male_df,family='binomial')
+    male_df['nPairbonds'][male_df['nPairbonds'] >= 1] = 1
+
+
+    model = Lmer("Eggs ~ Degree + nSongs + (1|Aviary)",data=male_df,family='gaussian')
     print(model.fit())
-    model = Lmer("nPairbonds ~ Degree + (1|Aviary)",data=male_df,family='binomial')
+
+    model = Lmer("nPairbonds ~ Degree + nSongs + (1|Aviary)",data=male_df,family='binomial')
+    print(model.fit())
+
+    male_df['EggScore'].replace([np.inf, -np.inf], np.nan, inplace=True)
+
+## Drop nan values, I couldn't do this before, because non pairbonded males have np.nan egg score
+    male_df = male_df.dropna()
+
+    model = Lmer("EggScore ~ Cohesion + (1|Degree)",data=male_df,family='gaussian')
+    print(model.fit())
+    model = Lmer("EggScore ~ Degree + nSongs + (1|Aviary)",data=male_df,family='gaussian')
     print(model.fit())
 
 ## So, this is sort of superficial, but the best evidence so far suggests that 

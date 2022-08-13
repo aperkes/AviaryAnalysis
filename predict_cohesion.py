@@ -37,6 +37,10 @@ from scipy.stats import pearsonr
 
 # First, I need an array of male behavior at each time t.
 # Not sure if I need the group behavior...
+
+import warnings
+warnings.filterwarnings("ignore", message="Mean of empty Slice")
+
 for a in range(len(metas)):
     n_males = metas[a].n_males
     n_females = metas[a].n_females
@@ -55,10 +59,8 @@ for a in range(len(metas)):
     for n in range(n_males):
         x = X[:,n]
         x = x.reshape([len(x),1])
-        print(f_ratio.shape)
         sub_ratio = f_ratio[1:,np.arange(n_males) != n]
         y = np.nanmean(sub_ratio,1)
-        print(y.shape,x.shape)
         #y = np.sum(Y[:,np.arange(n_males) != n],1)
         x = x[~np.isnan(y)]
         y = y[~np.isnan(y)]
@@ -81,16 +83,18 @@ for a in range(len(metas)):
     auto_corrs = np.diagonal(pairwise_corrs)
     np.fill_diagonal(pairwise_corrs,0)
     predictive_power = np.nanmean(np.abs(pairwise_corrs),axis=0)
-    print('correlation scores:',predictive_power)
-
-    print('prediction scores:',group_prediction_scores)
+    predictive_zscore = (predictive_power - np.nanmean(predictive_power))/np.nanstd(predictive_power)
+    if False:
+        print('correlation scores:',np.sort(predictive_power)[::-1])
+        print('z-scores:',np.sort(predictive_zscore)[::-1])
+        print('prediction scores:',group_prediction_scores)
     ax2.bar(np.arange(n_males),np.sort(predictive_power)[::-1])
     ax2.set_ylim([0,np.nanmax(predictive_power)])
     ax3.bar(np.arange(n_males),np.sort(group_prediction_scores)[::-1])
     ax3.set_ylim([0,np.nanmax(group_prediction_scores)])
-    plt.show()
+    if False:
+        plt.show()
     #print(np.sort(predictive_power))
-"""
 ## Calculate the 'other males' history bins and f_ratios
     for b in range(len(history_bins)):
         np.fill_diagonal(history_bins[b],0)
@@ -132,7 +136,6 @@ for a in range(len(metas)):
             data_list.append([b,metas[a].m_ids[m],a,male_f,other_f,last_f,last_f_other])
 print('done!')            
 df = pd.DataFrame(data_list,columns=columns)
-"""
 
 ## Reanlysis of cohesion using regression approach
 # Compare to individual egg scores

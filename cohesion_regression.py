@@ -31,7 +31,7 @@ metas = np.load('./metas.pkl.npy',allow_pickle=True)
 sorteds = np.load('./sorteds.pkl.npy',allow_pickle=True)
 
 ## Build df of group and individual % song to females
-columns = ['Bin','MaleID','Aviary','FemaleSong','GroupFemaleSong','LastFemaleSong','LastGroupFemaleSong']
+columns = ['Bin','MaleID','Aviary','FemaleSong','GroupFemaleSong','LastFemaleSong','LastGroupFemaleSong','LastDelta','Shift','GroupShift']
 
 win = 100
 data_list = []
@@ -72,7 +72,7 @@ for a in range(len(metas)):
         for b in range(len(f_ratio)):
             male_f = f_ratio[b,m]
             other_f = f_ratio_other[b]
-
+            
 ## If possible add previous bin data
             if np.abs(ts[b] - ts[b-1]) < 2*win: # check if the prior bin is relevent
                 last_f = f_ratio[b-1,m]
@@ -80,7 +80,11 @@ for a in range(len(metas)):
             else:
                 last_f = np.nan
                 last_f_other = np.nan
-            data_list.append([b,metas[a].m_ids[m],a,male_f,other_f,last_f,last_f_other])
+            last_delta = last_f - last_f_other
+            m_shift = male_f - last_f
+            group_shift = other_f - last_f_other
+
+            data_list.append([b,metas[a].m_ids[m],a,male_f,other_f,last_f,last_f_other,last_delta,m_shift,group_shift])
 print('done!')            
 df = pd.DataFrame(data_list,columns=columns)
 
@@ -94,6 +98,57 @@ if False:
 
 sub_df = df.dropna()
 
+print('Predict individual:',pearsonr(sub_df['LastDelta'],sub_df['Shift']))
+print('Predict group:',pearsonr(sub_df['LastDelta'],sub_df['GroupShift']))
+print('mean n bins:',len(sub_df)/len(pd.unique(sub_df['MaleID'])))
+
+## As above, but for each individual.
+mean_group,mean_ind = [],[]
+all_inds = []
+for a in range(19):
+    group_effects,ind_effects = [],[]
+    for m in metas[a].m_ids:
+        sub_df = df[df['MaleID'] == m]
+        sub_df = sub_df.dropna()
+        if len(sub_df['LastDelta']) < 2:
+            group_effects.append(np.nan)
+            ind_effects.append(np.nan)
+            continue
+        r,p = pearsonr(sub_df['LastDelta'],sub_df['Shift'])
+        group_effects.append(r)
+
+        r_,p_ = pearsonr(sub_df['LastDelta'],sub_df['GroupShift'])
+        ind_effects.append(r_)
+        all_inds.append(r_)
+    ind_effects = np.array(ind_effects)
+    group_effects = np.array(group_effects)
+    z_leaders = (ind_effects - np.nanmean(ind_effects) ) / np.nanstd(ind_effects)
+    z_follows = (group_effects - np.nanmean(group_effects) ) / np.nanstd(group_effects)
+    if np.nanmax(z_leaders) > 2:
+        print('##Check for leaders!##')
+        print(z_leaders)
+        m_id = metas[a].m_ids[z_leaders > 2]
+        print('non nan values:',len(df[df['MaleID'] == m_id[0]].dropna()))
+    if np.nanmax(z_follows) < -2:
+        print('Check for followers!')
+        print(z_follows)
+    print('leaders?:',ind_effects)
+    print('followers?:',group_effects)
+    mean_group.append(np.nanmean(group_effects))
+    mean_ind.append(np.nanmean(ind_effects))
+
+print(mean_group,mean_ind)
+print('mean across all inds',np.nanmean(all_inds),np.nanstd(all_inds))
+
+sub_df = df.dropna()
+family = 'gaussian'
+model = Lmer("Shift ~ LastDelta + (1|MaleID) + (1|Aviary) ",data=sub_df,family=family)
+print(model.fit())
+
+model = Lmer("GroupShift ~ LastDelta + (1|MaleID) + (1|Aviary) ",data=sub_df,family=family)
+print(model.fit())
+
+"""
 ## Both linear and binomial are significant, does residuals work for linear? 
 if False:
     family='binomial'
@@ -128,6 +183,37 @@ old_corrs = [0.2490299580487993, 0.03968002047721218, 0.17212216381734105, 0.071
 
 print('new vs old:',pearsonr(cohesion_scores,old_corrs))
 
+## Check on timing:
+
+groups = []
+indis = []
+
+ps,ps_ = [],[]
+
+for a in range(len(metas)):
+    sub_df = df[df['Aviary'] == a]
+    sub_df = sub_df.dropna()
+    for m in pd.unique(sub_df['MaleID']):
+        subber_df = sub_df[sub_df['MaleID'] == m]
+        r,p = pearsonr(subber_df['LastGroupFemaleSong'],subber_df['FemaleSong'])
+        groups.append(r)
+        ps.append(p)
+
+        r,p = pearsonr(subber_df['LastFemaleSong'],subber_df['GroupFemaleSong'])
+        indis.append(r)
+        ps_.append(p)
+
+print('Last Group:',np.nanmean(groups),np.nanmean(ps))
+print('Last Indi:',np.nanmean(indis),np.nanmean(ps_))
+
+sub_df = df.dropna()
+if True:
+    model = Lmer("FemaleSong ~ LastGroupFemaleSong + (1|MaleID) + (1|Aviary)",data=sub_df,family=family)
+    print(model.fit())
+
+    model = Lmer("GroupFemaleSong ~ LastFemaleSong + (1|Aviary)",data=sub_df,family=family)
+    print(model.fit())
+
 ## The above method is not significant, unless we exclude the outliers, and I don't understand it well enough to really know how much that means 
 
 ## In any case, moving on.
@@ -137,3 +223,4 @@ print('new vs old:',pearsonr(cohesion_scores,old_corrs))
 # Does individual regression score relate to egg score? I'm going to put a pin in that for now.
 
 ## Compare to individual egg scores
+"""
