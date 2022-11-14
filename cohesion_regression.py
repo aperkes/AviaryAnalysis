@@ -104,7 +104,7 @@ print('mean n bins:',len(sub_df)/len(pd.unique(sub_df['MaleID'])))
 
 ## As above, but for each individual.
 mean_group,mean_ind = [],[]
-all_inds = []
+all_inds,all_groups = [],[]
 for a in range(19):
     group_effects,ind_effects = [],[]
     for m in metas[a].m_ids:
@@ -120,6 +120,7 @@ for a in range(19):
         r_,p_ = pearsonr(sub_df['LastDelta'],sub_df['GroupShift'])
         ind_effects.append(r_)
         all_inds.append(r_)
+        all_groups.append(r * -1)
     ind_effects = np.array(ind_effects)
     group_effects = np.array(group_effects)
     z_leaders = (ind_effects - np.nanmean(ind_effects) ) / np.nanstd(ind_effects)
@@ -140,13 +141,41 @@ for a in range(19):
 print(mean_group,mean_ind)
 print('mean across all inds',np.nanmean(all_inds),np.nanstd(all_inds))
 
-sub_df = df.dropna()
-family = 'gaussian'
-model = Lmer("Shift ~ LastDelta + (1|MaleID) + (1|Aviary) ",data=sub_df,family=family)
-print(model.fit())
+if False:
+    sub_df = df.dropna()
+    family = 'gaussian'
+    model = Lmer("Shift ~ LastDelta + (1|MaleID) + (1|Aviary) ",data=sub_df,family=family)
+    print(model.fit())
 
-model = Lmer("GroupShift ~ LastDelta + (1|MaleID) + (1|Aviary) ",data=sub_df,family=family)
-print(model.fit())
+    model = Lmer("GroupShift ~ LastDelta + (1|MaleID) + (1|Aviary) ",data=sub_df,family=family)
+    print(model.fit())
+
+fig,(ax,ax1,ax2) = plt.subplots(3)
+
+all_inds = np.array(all_inds)
+all_groups = np.array(all_groups)
+
+ax.hist(all_inds,color='black')
+ax1.hist(all_groups,color='black')
+
+#ax.set_xlim([0,1])
+#ax1.set_xlim([0,1])
+
+ax.set_xlim([-0.2,0.8])
+ax1.set_xlim([-0.2,0.8])
+
+print(pearsonr(all_inds,all_groups))
+print('mean leadership',np.nanmean(all_inds))
+print('mean sensitivity',np.nanmean(all_groups))
+
+
+fit_line = np.poly1d(np.polyfit(all_inds,all_groups,1))
+ax2.scatter(all_inds,all_groups,color='black',alpha=.5)
+ax2.plot(all_inds,fit_line(all_inds),color='red')
+
+ax2.set_xlim([-0.2,0.8])
+ax2.set_ylim([-0.2,0.8])
+plt.show()
 
 """
 ## Both linear and binomial are significant, does residuals work for linear? 
