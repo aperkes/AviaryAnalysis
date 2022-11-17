@@ -141,7 +141,7 @@ for a in range(19):
 print(mean_group,mean_ind)
 print('mean across all inds',np.nanmean(all_inds),np.nanstd(all_inds))
 
-if False:
+if True:
     sub_df = df.dropna()
     family = 'gaussian'
     model = Lmer("Shift ~ LastDelta + (1|MaleID) + (1|Aviary) ",data=sub_df,family=family)
