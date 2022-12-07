@@ -330,6 +330,20 @@ def shuffle_indy_bins(history_bins):
         shuffle_bins[:,s] = singer_shuffle
     return shuffle_bins
 
+## Shuffle bins of the same day, to rule out season
+def shuffle_day_bins(history_bins,ts,meta):
+    all_days = np.array([day_of_year(t) for t in ts])
+    unique_days = np.unique(all_days)
+    shuffle_bins = np.empty_like(history_bins)
+    for d in unique_days:
+        day_indices = np.where(all_days == d)[0]
+        for m in range(meta.n_males):
+            singer_bins_day = history_bins[day_indices,meta.n_females+m,:]
+            singer_shuffle = np.random.permutation(singer_bins_day)
+            shuffle_bins[day_indices,meta.n_females+m] = singer_shuffle
+    shuffled_bins = history_bins
+    return shuffle_bins
+
 def shift_indy_bins(history_bins):
     n_birds = history_bins.shape[1]
     shifted_bins = np.empty_like(history_bins)
@@ -691,4 +705,21 @@ def f_pairbonded(history,meta):
     participation = f_sums > s_threshold
     return np.sum(pairbonds * participation)
 
+if __name__ == "__main__":
+    fname2 = './AviaryDataFiles/BS2017.txt'
+    test_data = np.genfromtxt(fname2,delimiter=',',dtype=str)
+
+    reorder = [4,5,6,7,8,1,3]
+
+    reorder_data = test_data[:,reorder]
+
+    dar_data = reorder_data[reorder_data[:,6] == 'DARWIN']
+    cop_data = reorder_data[reorder_data[:,6] == 'COOP']
+    cop_sorted, cop_meta = sort_data(cop_data, aviary='ON1-2017',date_format = 'dmy')
+    cop_history, cop_copulations = build_history(cop_sorted,cop_meta)
+    meta=cop_meta
+    sorted_data=cop_sorted
+    history=cop_history
+    history_bins,[history_rate_bins,ts,window_indices]=sliding_bin_history(sorted_data,history,meta,window=60)
+    print(shuffle_day_bins(history_bins,ts,meta).shape)
 
