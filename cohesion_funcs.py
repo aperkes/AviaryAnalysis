@@ -186,9 +186,11 @@ def overlap_history(aviary_data, meta_data,decay = .99):
 
 ## Simple version that just returns a binned version of history
 # Returns history_bins,[history_rate_bins,ts,window_indices]
-def bin_history(sorted_data,history_data,meta_data,window=100):
+def bin_history(sorted_data,history_data,meta_data,window=100,a_filter = None):
     zero_hour = datetime.strptime('00:00:00','%H:%M:%S')
 
+    if a_filter is not None:
+        history_data[a_filter] = 0
     ts, windows = [],[]
     window_indices = []
     count = 0
@@ -242,9 +244,10 @@ def bin_history(sorted_data,history_data,meta_data,window=100):
     return history_bins,[history_rate_bins,ts,window_indices]
   
 ## As above, but I use a sliding bin to (hopefully) avoid edge artifacts
-def sliding_bin_history(sorted_data,history_data,meta_data,window=100):
+def sliding_bin_history(sorted_data,history_data,meta_data,window=100,a_filter=None):
     zero_hour = datetime.strptime('00:00:00','%H:%M:%S')
-
+    if a_filter is not None:
+        history_data[a_filter] = 0
     ts, windows = [],[]
     window_indices = []
     count = 0
@@ -283,29 +286,31 @@ def sliding_bin_history(sorted_data,history_data,meta_data,window=100):
             elif count != 0:  ## What if we do have a long window with no songs?
                 history_t = np.sum(history_data[i_start:t-meta_data.start],0)
 
-                ts.append(bin_start)
-                win_size = meta_data.timestamps[t-1] - bin_start + 1
-                if win_size < window:
-                    win_size = window
-                    pass
-                windows.append(win_size)
-                window_indices.append([i_start,t-1])
-                
-                history_rate = history_t / win_size
-                history_bins.append(history_t)
-                history_rate_bins.append(history_rate)
-                #print('storying')
-                if halfway == t:
-                    #t -= 1
-                    halfway = False
-                else:
-                    t = halfway
-                    halfway = False
-                
-                if np.sum(history_t) == 0:
+                if np.sum(history_t) == 0: ## if you have a long window, just keep moving
                     ## findme
-                    import pdb
-                    pdb.set_trace()
+                    pass
+                    #import pdb
+                    #pdb.set_trace()
+                else:
+                    ts.append(bin_start)
+                    win_size = meta_data.timestamps[t-1] - bin_start + 1
+                    if win_size < window:
+                        win_size = window
+                        pass
+                    windows.append(win_size)
+                    window_indices.append([i_start,t-1])
+                    
+                    history_rate = history_t / win_size
+                    history_bins.append(history_t)
+                    history_rate_bins.append(history_rate)
+                    #print('storying')
+                    if halfway == t:
+                        #t -= 1
+                        halfway = False
+                    else:
+                        t = halfway
+                        halfway = False
+                    
             count = 0
             bin_start = 0 #meta_data.timestamps[t]
 
@@ -685,13 +690,16 @@ def define_countersong_bouts(sorted_data,meta):
     return countersongs,bout_dict
 
 ## Get the percent of female directed song in each bin
-def percent_to_females(history,meta,sorted_data,window=100,shuffle=False):
+def percent_to_females(history,meta,sorted_data,window=100,shuffle=False,a_filter=None):
     if True:
-        history_bins,[history_rate_bins,ts,window_indices]= sliding_bin_history(sorted_data,history,meta,window=window)
+        history_bins,[history_rate_bins,ts,window_indices]= sliding_bin_history(sorted_data,history,meta,window=window,a_filter=a_filter)
     else:
-        history_bins,[history_rate_bins,ts,window_indices]= bin_history(sorted_data,history,meta,window=window)
-    if shuffle:
+        history_bins,[history_rate_bins,ts,window_indices]= bin_history(sorted_data,history,meta,window=window,a_filter=a_filter)
+    if shuffle == True:
         history_bins = shuffle_indy_bins(history_bins)
+    elif shuffle == 'Day':
+        history_bins = shuffle_day_bins(history_bins,ts,meta)
+    #print(np.sum(history_bins[:10],(1,2)))
     n_females = meta.n_females
     f_songs = np.sum(history_bins[:,n_females:,:n_females],axis=(2))
     all_songs = np.sum(history_bins[:,n_females:],axis=(2))
@@ -738,7 +746,26 @@ def correlate_fsongs(history,meta,sorted_data,window=100,prune = False,shuffle=F
         fig.show()
     return corr_matrix
 
+## AS above, but uses only a subset of f_ratio
+def correlate_subset(sub_set):
+    n_males = sub_set.shape[1]
+    corr_matrix = np.zeros([n_males,n_males])
+    for m in range(n_males):
+        for n in range(n_males):
+            if m == n:
+                corr_matrix[m,n] = np.nan
+                continue
+            m_vals = sub_set[:,m]
+            n_vals = sub_set[:,n]
 
+            m_vals_clean = m_vals[~np.isnan(m_vals) & ~np.isnan(n_vals)]
+            n_vals_clean = n_vals[~np.isnan(m_vals) & ~np.isnan(n_vals)]
+            if len(m_vals_clean) > 1 and len(n_vals_clean) > 1:
+                r,p = spearmanr(m_vals_clean,n_vals_clean)
+            else:
+                r = np.nan
+            corr_matrix[m,n] = r
+        return corr_matrix
 def sex_ratio(meta):
     return meta.n_females / meta.n_males
 
@@ -779,6 +806,17 @@ if __name__ == "__main__":
     #print(shuffle_day_bins(history_bins,ts,meta).shape)
     print(len(history),len(sorted_data),len(meta.timestamps))
     countersongs,bout_dict = define_countersong_bouts(sorted_data,meta)
-    print(countersongs.shape)
-    print(bout_dict)
+    print('getting normal')
+    f_ratio,_ = percent_to_females(history,meta,sorted_data)
+    print('getting weird')
+    partial_ratio,_ = percent_to_females(history,meta,sorted_data,a_filter=countersongs.astype(bool))
+    print(f_ratio.shape)
+    print(partial_ratio.shape)
+
+    print(countersongs[:10])
+    print(np.nanmean(f_ratio[:10],1))
+    print(np.nanmean(partial_ratio[:10],1))
+
+    print(f_ratio==partial_ratio)
+    print(np.nanmean(f_ratio,1) == np.nanmean(partial_ratio,1))
 
