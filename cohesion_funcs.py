@@ -190,6 +190,7 @@ def bin_history(sorted_data,history_data,meta_data,window=100,a_filter = None):
     zero_hour = datetime.strptime('00:00:00','%H:%M:%S')
 
     if a_filter is not None:
+        history_data = np.array(history_data) ## If you don't do this, it changes original
         history_data[a_filter] = 0
     ts, windows = [],[]
     window_indices = []
@@ -247,6 +248,7 @@ def bin_history(sorted_data,history_data,meta_data,window=100,a_filter = None):
 def sliding_bin_history(sorted_data,history_data,meta_data,window=100,a_filter=None):
     zero_hour = datetime.strptime('00:00:00','%H:%M:%S')
     if a_filter is not None:
+        history_data = np.array(history_data) ## If you don't do this, it changes original
         history_data[a_filter] = 0
     ts, windows = [],[]
     window_indices = []
@@ -765,7 +767,8 @@ def correlate_subset(sub_set):
             else:
                 r = np.nan
             corr_matrix[m,n] = r
-        return corr_matrix
+    return corr_matrix
+
 def sex_ratio(meta):
     return meta.n_females / meta.n_males
 
