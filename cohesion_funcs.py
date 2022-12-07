@@ -629,6 +629,61 @@ def parse_eggs(aviary_eggs,meta,date_format = None,start_day = None):
 
 ## Defining metrics of cohesion, as well as functions for measuring possible confounds
 
+## Function to identify all instances of countersinging
+def find_countersong(sorted_data,meta):
+    countersongs = np.zeros(len(sorted_data))
+    for l in range(len(sorted_data)):
+        line = sorted_data[l]
+        singer,receiver = line[0],line[1]
+
+        if singer in meta.m_ids and receiver in meta.m_ids:
+            if singer == receiver:
+                continue
+            t = meta.timestamps[l]
+            window = (meta.timestamps > t - 15) & (meta.timestamps < t + 15)
+            for sub_line in sorted_data[window]:
+                if sub_line[0] == receiver and sub_line[1] == singer:
+                    countersongs[l] = 1
+                    break
+
+    return countersongs
+
+## Slightly convoluted function that groups countersong into bouts. 
+def define_countersong_bouts(sorted_data,meta):
+    countersongs = find_countersong(sorted_data,meta)
+    processed_songs = []
+    bout_dict = {}
+    for l in range(len(sorted_data)):
+        if not countersongs[l]:
+            continue
+        elif l in processed_songs:
+            continue
+        else:
+            participants = [sorted_data[l,0],sorted_data[l,1]]
+            bout = [l]
+            processed_songs.append(l)
+            t = meta.timestamps[l]
+            window = (meta.timestamps >= t) & (meta.timestamps < t + 15)
+            indices = window.nonzero()[0]
+            i = 0
+            while i < len(indices): ## careful....
+                sub_l = indices[i]
+                if sub_l in processed_songs:
+                    i += 1
+                    continue
+                sub_line = sorted_data[sub_l]
+                if sub_line[0] in participants and sub_line[1] in participants: 
+                    bout.append(sub_l)
+                    processed_songs.append(sub_l)
+                    t = meta.timestamps[sub_l]
+                    window = (meta.timestamps >= t) & (meta.timestamps < t + 15)
+                    indices = window.nonzero()[0]
+                    i = 0
+                i += 1
+
+            bout_dict[l] = bout
+    return countersongs,bout_dict
+
 ## Get the percent of female directed song in each bin
 def percent_to_females(history,meta,sorted_data,window=100,shuffle=False):
     if True:
@@ -721,5 +776,9 @@ if __name__ == "__main__":
     sorted_data=cop_sorted
     history=cop_history
     history_bins,[history_rate_bins,ts,window_indices]=sliding_bin_history(sorted_data,history,meta,window=60)
-    print(shuffle_day_bins(history_bins,ts,meta).shape)
+    #print(shuffle_day_bins(history_bins,ts,meta).shape)
+    print(len(history),len(sorted_data),len(meta.timestamps))
+    countersongs,bout_dict = define_countersong_bouts(sorted_data,meta)
+    print(countersongs.shape)
+    print(bout_dict)
 
