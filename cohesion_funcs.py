@@ -2,6 +2,8 @@
 
 import numpy as np
 from datetime import datetime,timedelta
+from scipy.stats import pearsonr, spearmanr
+import itertools
 
 ## Functions which are used in the cohesion paper
 
@@ -769,6 +771,23 @@ def correlate_subset(sub_set):
             corr_matrix[m,n] = r
     return corr_matrix
 
+## Function to return correlation iterating by sampling males
+def bootstrap_n_males(corr_matrix):
+    n_males = np.shape(corr_matrix)[0]
+    m_array = np.arange(n_males)
+    subset_values = {}
+    for r in range(2,n_males):
+        subsets = itertools.combinations(m_array,r)
+        subset_values[r] = []
+        for subset in subsets:
+            subset = list(subset)
+            rows = corr_matrix[subset]
+            sub_matrix = rows[:,subset]
+            sub_corr = np.nanmean(sub_matrix)
+            subset_values[r].append(sub_corr)
+    return subset_values
+
+
 def sex_ratio(meta):
     return meta.n_females / meta.n_males
 
@@ -807,19 +826,17 @@ if __name__ == "__main__":
     history=cop_history
     history_bins,[history_rate_bins,ts,window_indices]=sliding_bin_history(sorted_data,history,meta,window=60)
     #print(shuffle_day_bins(history_bins,ts,meta).shape)
-    print(len(history),len(sorted_data),len(meta.timestamps))
-    countersongs,bout_dict = define_countersong_bouts(sorted_data,meta)
-    print('getting normal')
     f_ratio,_ = percent_to_females(history,meta,sorted_data)
-    print('getting weird')
-    partial_ratio,_ = percent_to_females(history,meta,sorted_data,a_filter=countersongs.astype(bool))
-    print(f_ratio.shape)
-    print(partial_ratio.shape)
 
-    print(countersongs[:10])
-    print(np.nanmean(f_ratio[:10],1))
-    print(np.nanmean(partial_ratio[:10],1))
-
-    print(f_ratio==partial_ratio)
-    print(np.nanmean(f_ratio,1) == np.nanmean(partial_ratio,1))
+    corr_matrix = correlate_fsongs(history,meta,sorted_data,prune=True)
+    subset_values = bootstrap_n_males(corr_matrix)
+    #print(subset_values)
+    subset_means = []
+    subset_rs = []
+    for r in sorted(subset_values.keys()):
+        print(np.nanmean(subset_values[r]))
+        subset_means.append(np.nanmean(subset_values[r]))
+        subset_rs.append(r)
+        
+    print(pearsonr(subset_rs,subset_means))
 
