@@ -4,3 +4,5 @@ Code and Data for my recent preprint on the fitness benefits of social cohesion:
 
 There's still some commenting and organization to work to make it more readable, 
 but all the code for all the stats and figures is there.  
+
+There will be a google CoLab also: 
