@@ -60,11 +60,23 @@ for a in range(len(metas)):
         all_songs_other_ = np.sum(other_bins,axis=2)
         f_ratio_other_ = f_songs_other_/all_songs_other_
 
+## NOTE: Figure this out. I need to use the difference stuff that I calculate below.
+        print(f_ratio.shape)
+        for i in range(n_males):
+            for j in range(n_males):
+                if i == j:
+                    continue
+                other_clean = f_ratio[:,j][(~np.isnan(f_ratio[:,j])) & (~np.isnan(f_ratio[:,i]))]
+                self_clean = f_ratio[:,i][~np.isnan(f_ratio[:,j]) & ~np.isnan(f_ratio[:,i])]
+                print('pearsons for',i,j,pearsonr(self_clean,other_clean))
+            break
+
         f_songs_other = np.sum(other_bins[:,:,:n_females],axis=(2,1))
         all_songs_other = np.sum(other_bins,axis=(2,1))
 
         f_ratio_other = np.round(f_songs_other / all_songs_other,4)
         f_ratio_other_ = np.nanmean(f_ratio_other_,axis=1)
+
         if False:
             f_ratio_other = f_ratio_other_
 
@@ -85,6 +97,7 @@ for a in range(len(metas)):
             group_shift = other_f - last_f_other
 
             data_list.append([b,metas[a].m_ids[m],a,male_f,other_f,last_f,last_f_other,last_delta,m_shift,group_shift])
+    break
 print('done!')            
 df = pd.DataFrame(data_list,columns=columns)
 
@@ -133,8 +146,8 @@ for a in range(19):
     if np.nanmax(z_follows) < -2:
         print('Check for followers!')
         print(z_follows)
-    print('leaders?:',ind_effects)
-    print('followers?:',group_effects)
+    #print('leaders?:',ind_effects)
+    #print('followers?:',group_effects)
     mean_group.append(np.nanmean(group_effects))
     mean_ind.append(np.nanmean(ind_effects))
 
@@ -165,8 +178,8 @@ ax.set_xlim([-0.2,0.8])
 ax1.set_xlim([-0.2,0.8])
 
 print(pearsonr(all_inds,all_groups))
-print('mean leadership',np.nanmean(all_inds))
-print('mean sensitivity',np.nanmean(all_groups))
+print('mean leadership',np.nanmean(all_inds),np.nanstd(all_inds))
+print('mean sensitivity',np.nanmean(all_groups),np.nanstd(all_groups))
 
 
 fit_line = np.poly1d(np.polyfit(all_inds,all_groups,1))
