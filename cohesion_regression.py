@@ -35,6 +35,9 @@ columns = ['Bin','MaleID','Aviary','FemaleSong','GroupFemaleSong','LastFemaleSon
 
 win = 100
 data_list = []
+
+all_sigmas = []
+all_leaders = []
 for a in range(len(metas)):
     n_males = metas[a].n_males
     n_females = metas[a].n_females
@@ -47,6 +50,9 @@ for a in range(len(metas)):
         np.fill_diagonal(history_bins[b],0)
 ## Note that this is slight different, in that I'm summing all songs, rather than by males
 ## Trying summing by males to balance similar to cohesion
+    prediction_matrix = np.empty([n_males,n_males])
+    prediction_matrix.fill(np.nan)
+    prediction_matrix_ps = np.array(prediction_matrix)
     for m in range(n_males):
         if np.sum(f_songs[:,m]) < 10:
             continue
@@ -61,16 +67,31 @@ for a in range(len(metas)):
         f_ratio_other_ = f_songs_other_/all_songs_other_
 
 ## NOTE: Figure this out. I need to use the difference stuff that I calculate below.
-        print(f_ratio.shape)
-        for i in range(n_males):
-            for j in range(n_males):
-                if i == j:
-                    continue
-                other_clean = f_ratio[:,j][(~np.isnan(f_ratio[:,j])) & (~np.isnan(f_ratio[:,i]))]
-                self_clean = f_ratio[:,i][~np.isnan(f_ratio[:,j]) & ~np.isnan(f_ratio[:,i])]
-                print('pearsons for',i,j,pearsonr(self_clean,other_clean))
-            break
+        f_current = f_ratio[1:]
+        f_previous = f_ratio[:-1]
+        f_shift = f_current - f_previous
+        for j in range(n_males):
+            if m == j:
+                continue
+            other_previous = f_previous[:,j][(~np.isnan(f_previous[:,j])) & (~np.isnan(f_shift[:,m]))]
+            self_shift = f_shift[:,m][~np.isnan(f_previous[:,j]) & ~np.isnan(f_shift[:,m])]
+            if len(other_previous) > 1:
+                r,p = pearsonr(other_previous,self_shift)
 
+                prediction_matrix[m,j] = r 
+                prediction_matrix_ps[m,j] = p
+            #print('pearsons for',i,j,pearsonr(other_previous,self_shift))
+            
+        if m == n_males - 1:
+            #print('Aviary:',a)
+            #print(prediction_matrix)
+            #print(np.nanmax(prediction_matrix),np.nanmin(prediction_matrix),np.nanmean(prediction_matrix))
+            sigma_matrix = (prediction_matrix - np.nanmean(prediction_matrix,0)) / np.nanstd(prediction_matrix,0)
+            leader_matrix = np.nanmean(prediction_matrix,1)
+            all_leaders.extend(leader_matrix.flatten()[~np.isnan(leader_matrix.flatten())])
+            #print('Sigma:',sigma_matrix)
+            all_sigmas.extend(sigma_matrix.flatten()[~np.isnan(sigma_matrix.flatten())])
+            #print(all_sigmas)
         f_songs_other = np.sum(other_bins[:,:,:n_females],axis=(2,1))
         all_songs_other = np.sum(other_bins,axis=(2,1))
 
@@ -97,7 +118,7 @@ for a in range(len(metas)):
             group_shift = other_f - last_f_other
 
             data_list.append([b,metas[a].m_ids[m],a,male_f,other_f,last_f,last_f_other,last_delta,m_shift,group_shift])
-    break
+
 print('done!')            
 df = pd.DataFrame(data_list,columns=columns)
 
@@ -107,6 +128,11 @@ df = pd.DataFrame(data_list,columns=columns)
 if False:
     fig,ax = plt.subplots()
     ax.scatter(df['GroupFemaleSong'],df['FemaleSong'],alpha=.2)
+    plt.show()
+elif True:
+    fig,(ax,ax1) = plt.subplots(2)
+    ax.hist(all_sigmas)
+    ax1.hist(all_leaders)
     plt.show()
 
 sub_df = df.dropna()
@@ -128,12 +154,24 @@ for a in range(19):
             ind_effects.append(np.nan)
             continue
         r,p = pearsonr(sub_df['LastDelta'],sub_df['Shift'])
-        group_effects.append(r)
+
+        md = smf.ols("Shift ~ LastDelta",data=sub_df)
+        effect_of_group = md.fit().params['LastDelta']
+        group_effects.append(effect_of_group) ## Two ways to calculate things here, this gives effect strength, which is easier to compare
+        #group_effects.append(r)
 
         r_,p_ = pearsonr(sub_df['LastDelta'],sub_df['GroupShift'])
-        ind_effects.append(r_)
-        all_inds.append(r_)
-        all_groups.append(r * -1)
+        md = smf.ols("GroupShift ~ LastDelta",data=sub_df)
+        effect_of_ind = md.fit().params['LastDelta']
+
+        ind_effects.append(effect_of_ind) ## Two ways to calculate things here, this gives effect strength, which is easier to compare
+        #ind_effects.append(r_)
+
+        #all_inds.append(r_)
+        #all_groups.append(r * -1)
+        all_inds.append(effect_of_ind)
+        all_groups.append(effect_of_group * -1)
+
     ind_effects = np.array(ind_effects)
     group_effects = np.array(group_effects)
     z_leaders = (ind_effects - np.nanmean(ind_effects) ) / np.nanstd(ind_effects)
