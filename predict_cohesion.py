@@ -32,7 +32,7 @@ data_list = []
 from sklearn.linear_model import LinearRegression as LR
 from sklearn.linear_model import LogisticRegression as LogR
 from scipy.optimize import lsq_linear
-from constrained_linear_regression import ConstrainedLinearRegression
+#from constrained_linear_regression import ConstrainedLinearRegression
 from scipy.stats import pearsonr
 
 # First, I need an array of male behavior at each time t.
@@ -137,5 +137,6 @@ for a in range(len(metas)):
 print('done!')            
 df = pd.DataFrame(data_list,columns=columns)
 
+df.to_csv('predction_df.csv',index=False)
 ## Reanlysis of cohesion using regression approach
 # Compare to individual egg scores
