@@ -136,18 +136,22 @@ elif True:
 sub_df = df.dropna()
 sub_df.to_csv('cohesion_df.csv',index=False)
 
-import pdb;pdb.set_trace()
+#import pdb;pdb.set_trace()
 
-if False:
-
-    from pymer4.models import Lmer
-    print('Predict individual:',pearsonr(sub_df['LastDelta'],sub_df['Shift']))
-    print('Predict group:',pearsonr(sub_df['LastDelta'],sub_df['GroupShift']))
-    print('mean n bins:',len(sub_df)/len(pd.unique(sub_df['MaleID'])))
+if True:
+    leaders_list = []
+    
+    if False:
+        from pymer4.models import Lmer
+    if False:
+        print('Predict individual:',pearsonr(sub_df['LastDelta'],sub_df['Shift']))
+        print('Predict group:',pearsonr(sub_df['LastDelta'],sub_df['GroupShift']))
+        print('mean n bins:',len(sub_df)/len(pd.unique(sub_df['MaleID'])))
 
 ## As above, but for each individual.
     mean_group,mean_ind = [],[]
     all_inds,all_groups = [],[]
+    inds_info = []
     for a in range(19):
         group_effects,ind_effects = [],[]
         for m in metas[a].m_ids:
@@ -165,38 +169,48 @@ if False:
             #group_effects.append(r)
 
             r_,p_ = pearsonr(sub_df['LastDelta'],sub_df['GroupShift'])
+## Last Delta is the direction of the individual to the group, so we expect individuals to pull the group towards them
+## (group shift). When we do groups pulling individuals (shift) we need to reverse the vector, which we do below
             md = smf.ols("GroupShift ~ LastDelta",data=sub_df)
             effect_of_ind = md.fit().params['LastDelta']
 
             ind_effects.append(effect_of_ind) ## Two ways to calculate things here, this gives effect strength, which is easier to compare
             #ind_effects.append(r_)
 
+            #import pdb;pdb.set_trace()
             #all_inds.append(r_)
-            #all_groups.append(r * -1)
+            #all_groups.append(r * -1) 
             all_inds.append(effect_of_ind)
-            all_groups.append(effect_of_group * -1)
+            inds_info.append((a,m))
+            all_groups.append(effect_of_group * -1) ## Why negative? : Because Last Delta is a vector, see above
+            #all_groups.append(effect_of_group)
+            leaders_list.append([m,a,effect_of_ind,effect_of_group * -1])
 
         ind_effects = np.array(ind_effects)
         group_effects = np.array(group_effects)
         z_leaders = (ind_effects - np.nanmean(ind_effects) ) / np.nanstd(ind_effects)
         z_follows = (group_effects - np.nanmean(group_effects) ) / np.nanstd(group_effects)
         if np.nanmax(z_leaders) > 2:
-            print('##Check for leaders!##')
-            print(z_leaders)
+            #print('##Check for leaders!##')
+            #print(z_leaders)
             m_id = metas[a].m_ids[z_leaders > 2]
-            print('non nan values:',len(df[df['MaleID'] == m_id[0]].dropna()))
+            #print('non nan values:',len(df[df['MaleID'] == m_id[0]].dropna()))
         if np.nanmax(z_follows) < -2:
-            print('Check for followers!')
-            print(z_follows)
+            #print('Check for followers!')
+            #print(z_follows)
+            pass
         #print('leaders?:',ind_effects)
         #print('followers?:',group_effects)
         mean_group.append(np.nanmean(group_effects))
         mean_ind.append(np.nanmean(ind_effects))
 
-    print(mean_group,mean_ind)
+    #print(mean_group,mean_ind)
     print('mean across all inds',np.nanmean(all_inds),np.nanstd(all_inds))
+    
+    leaders_df = pd.DataFrame(leaders_list,columns=['MaleID','Aviary','IndOnGroup','GroupOnInd'])
+    leaders_df.to_csv('leaders_df.csv',index=False)
 
-    if True:
+    if False:
         sub_df = df.dropna()
         family = 'gaussian'
         model = Lmer("Shift ~ LastDelta + (1|MaleID) + (1|Aviary) ",data=sub_df,family=family)
@@ -221,8 +235,15 @@ if False:
 
     print(pearsonr(all_inds,all_groups))
     print('mean leadership',np.nanmean(all_inds),np.nanstd(all_inds))
-    print('mean sensitivity',np.nanmean(all_groups),np.nanstd(all_groups))
+    lead_mean = np.nanmean(all_inds)
+    lead_std = np.nanstd(all_inds)
 
+    all_inds_sorted = np.sort(all_inds)
+    print(np.sum(all_inds_sorted < (lead_mean - lead_std * 2)))
+    print(np.sum(all_inds_sorted > (lead_mean + lead_std * 2)))
+    import pdb;pdb.set_trace()
+
+    print('mean sensitivity',np.nanmean(all_groups),np.nanstd(all_groups))
 
     fit_line = np.poly1d(np.polyfit(all_inds,all_groups,1))
     ax2.scatter(all_inds,all_groups,color='black',alpha=.5)
