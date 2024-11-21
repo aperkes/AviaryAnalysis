@@ -63,8 +63,8 @@ plot(season.df$Day,season.df$Cohesion)
 
 ## Simple correlation (one-sided test) between egg score and cohesion: 
 
-cor.test(aviary.df$EggScore,aviary.df$Cohesion,alternative='greater')
-
+res.cohesion <- cor.test(aviary.df$EggScore,aviary.df$Cohesion,alternative='greater')
+res.cohesion
 ## Regression of cohesion vs egg score
 cohesion.aviary <- lm(EggScore ~ Cohesion, data=aviary.df)
 summary(cohesion.aviary)
@@ -74,6 +74,37 @@ plot(simulationOutput)
 
 par(mfrow = c(2, 2))
 plot(cohesion.aviary)
+
+## Remove the two aviaries with prior pairbonds:
+aviary.df
+aviary.naive <- aviary.df[-c(11,13),]
+aviary.naive$Cohesion
+cohesion.aviaryNaive <- lm(EggScore ~ Cohesion, data=aviary.naive)
+summary(cohesion.aviaryNaive)
+
+## note this is robust to the specific window: 
+cohesion.aviaryNaive2 <- lm(EggScore ~ CohesionWindowed, data=aviary.naive)
+summary(cohesion.aviaryNaive2)
+
+## Back to including all the aviaires, averaging across all possible window sizes you get roughly the same corr
+## but now not quite significant at p=0.05. 
+res.cohesion2 <- cor.test(aviary.df$EggScore,aviary.df$CohesionWindowed,alternative='greater')
+res.cohesion2
+
+## We initially calculated the window-averaged value using bootstrapped confidence intervals
+## (see jupyter notebook)
+## This is because 
+## a) our sample size is quite small so it seemed appropriate
+## b) when I was initially doing this, python's pearsonr p-value documentation 
+####   described it as being a rough estimate, which I didn't love, so bootstrapping
+####  seemed appropriate, especially since I was shuffling randomizing window size anyway
+
+## I've since rerun the stats in R in a few different ways and realized that the effect significance is really marginal, 
+##   so some ways are just above p=0.05 and others just below, but I am sticking 
+##   with what I did first. 
+## I think given the explorational nature of this, this is ok, but it's obviously 
+## a caveat here. 
+## All of this is just a detail in the paper to say that changing window size for 60s does not eliminate this effect, 
 
 ## Log eggs doesn't improve things really. 
 #aviary.df[,'LogEggs'] = log(aviary.df$EggScore)
@@ -276,4 +307,6 @@ cohesion.follower <- lmer(FemaleSong ~ LastGroupFemaleSong + (1|MaleID) + (1|Avi
 summary(cohesion.follower)
 r.squaredGLMM(cohesion.follower)
 
+### The python script cohesion_regression.py calculates each cohesion, which are stored in 
+## leaders_df.csv
 
