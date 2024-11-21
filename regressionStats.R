@@ -78,7 +78,9 @@ plot(cohesion.aviary)
 ## Remove the two aviaries with prior pairbonds:
 aviary.df
 aviary.naive <- aviary.df[-c(11,13),]
+aviary.naive <- aviary.df[-c(2,11,13),]
 aviary.naive$Cohesion
+
 cohesion.aviaryNaive <- lm(EggScore ~ Cohesion, data=aviary.naive)
 summary(cohesion.aviaryNaive)
 
@@ -86,9 +88,12 @@ summary(cohesion.aviaryNaive)
 cohesion.aviaryNaive2 <- lm(EggScore ~ CohesionWindowed, data=aviary.naive)
 summary(cohesion.aviaryNaive2)
 
+res.cohesion3 <- cor.test(aviary.naive$EggScore,aviary.naive$CohesionWindowed)
+res.cohesion3
+
 ## Back to including all the aviaires, averaging across all possible window sizes you get roughly the same corr
 ## but now not quite significant at p=0.05. 
-res.cohesion2 <- cor.test(aviary.df$EggScore,aviary.df$CohesionWindowed,alternative='greater')
+res.cohesion2 <- cor.test(aviary.df$EggScore,aviary.df$CohesionWindowed)
 res.cohesion2
 
 ## We initially calculated the window-averaged value using bootstrapped confidence intervals
